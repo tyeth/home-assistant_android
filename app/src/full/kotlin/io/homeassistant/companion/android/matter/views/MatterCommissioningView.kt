@@ -51,8 +51,10 @@ fun MatterCommissioningView(
     step: CommissioningFlowStep,
     deviceName: String?,
     servers: List<Server>,
+    threadSyncResult: Boolean?,
     onSelectServer: (Int) -> Unit,
     onConfirmCommissioning: () -> Unit,
+    onSyncThreadCredentials: () -> Unit,
     onClose: () -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
@@ -161,6 +163,30 @@ fun MatterCommissioningView(
                 }
             }
 
+            if (step is CommissioningFlowStep.Failure) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = if (threadSyncResult == true) {
+                        stringResource(commonR.string.matter_shared_thread_sync_success)
+                    } else if (threadSyncResult == false) {
+                        stringResource(commonR.string.matter_shared_thread_sync_failed)
+                    } else {
+                        stringResource(commonR.string.matter_shared_status_failure_thread_hint)
+                    },
+                    style = MaterialTheme.typography.body2,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (threadSyncResult != true) {
+                    TextButton(
+                        onClick = onSyncThreadCredentials,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    ) {
+                        Text(stringResource(commonR.string.thread_debug))
+                    }
+                }
+            }
+
             if (step !in loadingSteps) {
                 Row(
                     modifier = Modifier
@@ -249,8 +275,10 @@ private fun PreviewMatterCommissioningView(
                     user = ServerUserInfo(),
                 ),
             ),
+            threadSyncResult = null,
             onSelectServer = { },
             onConfirmCommissioning = { },
+            onSyncThreadCredentials = { },
             onClose = { },
             onContinue = { },
         )
