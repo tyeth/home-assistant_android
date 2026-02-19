@@ -33,6 +33,11 @@ class MatterCommissioningActivity : AppCompatActivity() {
             deviceCode?.let { viewModel.onThreadPermissionResult(result, it) }
         }
 
+    private val threadSyncPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            viewModel.onThreadSyncPermissionResult(result)
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdgeCompat()
@@ -43,8 +48,10 @@ class MatterCommissioningActivity : AppCompatActivity() {
                     step = viewModel.step,
                     deviceName = deviceName,
                     servers = viewModel.servers,
+                    threadSyncResult = viewModel.threadSyncResult,
                     onSelectServer = viewModel::checkSupport,
                     onConfirmCommissioning = { startCommissioning() },
+                    onSyncThreadCredentials = { syncThreadCredentials() },
                     onClose = { finish() },
                     onContinue = { continueToApp(false) },
                 )
@@ -95,6 +102,15 @@ class MatterCommissioningActivity : AppCompatActivity() {
                 deviceCode?.let {
                     viewModel.commissionDeviceWithCode(it)
                 }
+            }
+        }
+    }
+
+    private fun syncThreadCredentials() {
+        lifecycleScope.launch {
+            val exportIntent = viewModel.syncThreadCredentials()
+            if (exportIntent != null) {
+                threadSyncPermissionLauncher.launch(IntentSenderRequest.Builder(exportIntent).build())
             }
         }
     }

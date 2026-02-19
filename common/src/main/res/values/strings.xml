@@ -460,6 +460,9 @@
     <string name="matter_shared_status_success">The device has been added!</string>
     <string name="matter_shared_status_failure_code">Unable to add the device to Home Assistant (error code %1$d). Would you like to try again?</string>
     <string name="matter_shared_status_failure">Unable to add the device to Home Assistant. Would you like to try again?</string>
+    <string name="matter_shared_status_failure_thread_hint">If this is a Thread device, syncing Thread credentials between your device and Home Assistant may help.</string>
+    <string name="matter_shared_thread_sync_success">Thread credentials synced successfully. Try adding the device again.</string>
+    <string name="matter_shared_thread_sync_failed">Unable to sync Thread credentials</string>
     <string name="maximum">Maximum</string>
     <string name="media_player">Media player</string>
     <string name="media_player_widget_desc">Control any media player and see current now playing image</string>

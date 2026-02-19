@@ -14,7 +14,9 @@ import io.homeassistant.companion.android.common.data.servers.ServerManager
 import io.homeassistant.companion.android.database.server.Server
 import io.homeassistant.companion.android.thread.ThreadManager
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @HiltViewModel
 class MatterCommissioningViewModel @Inject constructor(
@@ -35,6 +37,13 @@ class MatterCommissioningViewModel @Inject constructor(
         object Success : CommissioningFlowStep()
         class Failure(val errorCode: Int? = null) : CommissioningFlowStep()
     }
+
+    /**
+     * Result of a Thread credential sync triggered from the failure screen.
+     * `true` indicates success, `false` indicates failure, `null` means no sync has been attempted.
+     */
+    var threadSyncResult by mutableStateOf<Boolean?>(null)
+        private set
 
     var step by mutableStateOf<CommissioningFlowStep>(CommissioningFlowStep.NotStarted)
         private set
@@ -109,6 +118,7 @@ class MatterCommissioningViewModel @Inject constructor(
     fun commissionDeviceWithCode(code: String) {
         viewModelScope.launch {
             step = CommissioningFlowStep.Working
+            threadSyncResult = null
 
             val result = matterManager.commissionDevice(code, serverId)
             step =
@@ -117,6 +127,71 @@ class MatterCommissioningViewModel @Inject constructor(
                 } else {
                     CommissioningFlowStep.Failure(result?.errorCode)
                 }
+        }
+    }
+
+    /**
+     * Syncs Thread credentials between the device and the server.
+     * @return an [IntentSender] if the user needs to grant permission to export credentials,
+     * or `null` if the sync completed without user interaction
+     */
+    suspend fun syncThreadCredentials(): IntentSender? {
+        threadSyncResult = null
+        return try {
+            val syncResult = threadManager.syncPreferredDataset(
+                context = getApplication(),
+                serverId = serverId,
+                exportOnly = false,
+                scope = viewModelScope,
+            )
+            when (syncResult) {
+                is ThreadManager.SyncResult.OnlyOnServer -> {
+                    threadSyncResult = syncResult.imported
+                    null
+                }
+                is ThreadManager.SyncResult.OnlyOnDevice -> {
+                    syncResult.exportIntent
+                }
+                is ThreadManager.SyncResult.AllHaveCredentials -> {
+                    if (syncResult.exportIntent != null) {
+                        syncResult.exportIntent
+                    } else {
+                        threadSyncResult = syncResult.matches == true ||
+                            (syncResult.fromApp == true && syncResult.updated == true)
+                        null
+                    }
+                }
+                is ThreadManager.SyncResult.NoneHaveCredentials -> {
+                    threadSyncResult = false
+                    null
+                }
+                else -> {
+                    threadSyncResult = false
+                    null
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "Error syncing Thread credentials from commissioning failure screen")
+            threadSyncResult = false
+            null
+        }
+    }
+
+    /**
+     * Processes the result of the Thread credential export permission request triggered from the
+     * commissioning failure screen.
+     */
+    fun onThreadSyncPermissionResult(result: ActivityResult) {
+        viewModelScope.launch {
+            try {
+                val networkName = threadManager.sendThreadDatasetExportResult(result, serverId)
+                threadSyncResult = networkName != null
+            } catch (e: Exception) {
+                Timber.e(e, "Error processing Thread sync permission result")
+                threadSyncResult = false
+            }
         }
     }
 }
